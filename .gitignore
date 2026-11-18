@@ -1,0 +1,13 @@
+# Secrets
+.env
+
+# Virtual environment
+.venv/
+
+# Python / Jupyter
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
