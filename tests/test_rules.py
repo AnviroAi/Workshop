@@ -38,3 +38,10 @@ def test_pii_regexes_match_our_formats():
 
 def test_data_is_synthetic():
     assert all(p["name"].endswith("Demo") for p in PATIENTS.values())
+
+
+def test_find_reading_in_patient_message():
+    from app.middleware import find_reading
+    assert find_reading("my bp is 190/120 what should I do?") == ("blood_pressure", "190/120")
+    assert find_reading("my sugar is 320 this morning") == ("glucose", "320")
+    assert find_reading("What's my blood pressure target?") is None

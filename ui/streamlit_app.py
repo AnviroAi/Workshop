@@ -37,12 +37,12 @@ PEOPLE = {
              "context": {"user_id": "sara", "role": "patient", "patient_token": "p-001"},
              "try": ["What's my blood pressure target?", "My BP is 128/82 this morning", "My BP is 190/120",
                      "How do I measure my blood pressure?", "Should I double my dose?",
-                     "Book me an appointment", "My knee hurts when I walk"]},
+                     "Book me an appointment", "1970-03-14", "My knee hurts when I walk"]},
     "omar": {"name": "Omar", "avatar": "👨", "role": "Patient", "about": "Type 2 diabetes",
              "context": {"user_id": "omar", "role": "patient", "patient_token": "p-002"},
              "try": ["Show my recent readings", "My sugar is 145 today", "My glucose is 350",
                      "What should I do if my sugar is low?", "What did the doctor note last time?",
-                     "What do you remember about me?"]},
+                     "Book me an appointment", "1962-11-02", "What do you remember about me?"]},
     "dr_lee": {"name": "Dr. Lee", "avatar": "🧑‍⚕️", "role": "Clinician", "about": "Nurse inbox · patients",
                "context": {"user_id": "dr_lee", "role": "doctor", "patient_token": "p-001"},
                "try": ["Who needs attention today?", "Show recent readings", "What is in the care plan?"]},
@@ -50,6 +50,12 @@ PEOPLE = {
 
 
 # ───────────────────────── small helpers ─────────────────────────
+
+def dob(person):
+    """Synthetic date of birth, shown so you can pass verify_identity in the demo."""
+    token = person["context"]["patient_token"] if person["role"] == "Patient" else None
+    return f"  \nDOB {PATIENTS[token]['date_of_birth']}" if token else ""
+
 
 def chips(names, css=""):
     return "".join(f'<span class="chip {css}">{html.escape(n)}</span>' for n in names)
@@ -370,7 +376,7 @@ with st.sidebar:
     st.divider()
     who = st.radio("Signed in as", list(PEOPLE), key="who",
                    format_func=lambda k: f"{PEOPLE[k]['avatar']}  {PEOPLE[k]['name']}",
-                   captions=[f"{p['role']} · {p['about']}" for p in PEOPLE.values()])
+                   captions=[f"{p['role']} · {p['about']}" + dob(p) for p in PEOPLE.values()])
     st.selectbox("Language", ["English", "Urdu", "Spanish", "Arabic"], key="language",
                  help="Part of the runtime context. The prompt tells the model to reply in it.")
     st.toggle("🎓 Learning mode", value=True, key="learning",

@@ -36,7 +36,7 @@ def is_urgent(patient_token: str, kind: str, value: str) -> bool:
     return False
 
 
-# ── care (step 1-2) ──
+# ── care (notebooks 01 and 03) ──
 
 @tool
 def get_care_plan(runtime: ToolRuntime[CareContext]) -> str:
@@ -77,7 +77,7 @@ def escalate_to_nurse(reason: str, runtime: ToolRuntime[CareContext]) -> str:
     return f"Nurse alerted about {runtime.context.patient_token}: {reason}"
 
 
-# ── identity, booking, doctors (step 4) ──
+# ── identity, booking, doctors (notebook 02) ──
 
 @tool
 def verify_identity(date_of_birth: str, runtime: ToolRuntime[CareContext]) -> Command:
@@ -113,7 +113,7 @@ def patients_needing_attention() -> str:
     return "\n".join(flagged) or "No patients above threshold right now."
 
 
-# ── long-term memory (step 6) ──
+# ── long-term memory (notebook 06) ──
 
 def memory_namespace(patient_token: str):
     return ("memories", patient_token)

@@ -70,6 +70,10 @@ def to_steps(node: str, update) -> list[dict]:
     if node.startswith("dose_guard"):
         return [{"kind": "guard", "icon": "🛡️", "title": "dose_guard answered. The model was never called.",
                  "detail": short(text_of(update["messages"][-1]))}]
+    if node.startswith("urgent_reading_guard"):
+        call = update["messages"][-1]["tool_calls"][0]
+        return [{"kind": "guard", "icon": "🚨", "title": "urgent_reading_guard called log_reading itself. The model was skipped.",
+                 "detail": f"{call['name']}({json.dumps(call['args'])})"}]
     if node.startswith("PIIMiddleware"):
         return [{"kind": "guard", "icon": "🔒", "title": f"{label}: redacted personal data"}]
     if node.startswith("Summarization"):

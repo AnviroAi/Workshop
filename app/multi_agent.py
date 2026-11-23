@@ -1,4 +1,4 @@
-"""Step 5: safety node -> supervisor -> specialist agents. langgraph.json serves `care_team`."""
+"""Notebook 05: safety node -> supervisor -> specialist agents. langgraph.json serves `care_team`."""
 import re
 
 from langchain.agents import create_agent
@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from app import tools as t
 from app.context import MODEL, CareContext
-from app.middleware import SYSTEM_PROMPT
+from app.middleware import SYSTEM_PROMPT, dose_guard
 from app.rag import search_documents
 
 records_agent = create_agent(
@@ -62,9 +62,19 @@ def write_previsit_brief(runtime: ToolRuntime[CareContext]) -> str:
     return result["structured_response"].model_dump_json(indent=2)
 
 
+SUPERVISOR_PROMPT = """You are the front desk of a care team. You know NOTHING about the patient
+or our documents yourself, so never answer from your own knowledge.
+For every request, call a specialist and pass on the patient's words exactly, including any numbers:
+- ask_records_agent: care plans, targets, medicines, readings (including new ones to log), symptoms,
+  how-to questions and check-in notes
+- ask_booking_agent: appointment slots and booking
+- write_previsit_brief: a doctor's brief before a visit
+Then relay the specialist's answer. Never give or change medicine doses."""
+
 supervisor = create_agent(
     MODEL, tools=[ask_records_agent, ask_booking_agent, write_previsit_brief],
-    system_prompt=SYSTEM_PROMPT + "\nDelegate to the right specialist. Pass on the full request, including any numbers.",
+    system_prompt=SUPERVISOR_PROMPT,
+    middleware=[dose_guard],   # same code-level guard as notebook 03
     context_schema=CareContext)
 
 EMERGENCY = re.compile(r"chest pain|can'?t breathe|unconscious|stroke|suicid", re.I)   # CUSTOM: triage policy
