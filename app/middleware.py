@@ -6,6 +6,7 @@ asynchronously, so our own wrap_* hooks and the prompt are `async def` and `awai
 import re
 from datetime import datetime
 from typing import NotRequired
+from uuid import uuid4
 
 from langchain.agents import AgentState
 from langchain.agents.middleware import (
@@ -17,6 +18,7 @@ from langchain.chat_models import init_chat_model
 from langchain.messages import AIMessage, HumanMessage
 
 from app.context import FALLBACK_MODEL, MODEL
+from app.tools import is_urgent
 
 SYSTEM_PROMPT = """You are a care assistant for patients with long-term conditions.
 You help patients log readings and symptoms and understand their care plan.
@@ -38,7 +40,7 @@ Rules:
 - Use remember to save lasting facts (ongoing problems, preferences). If you remember an ongoing problem, ask how it is going."""
 
 
-# ── step 2: dose guard ──
+# ── notebook 03: dose guard ──
 DOSE_QUESTION = re.compile(r"\b(dose|dosage|doses|\d+\s?mg|double|stop taking)\b", re.I)   # CUSTOM: safety policy
 DOSE_REFUSAL = ("I can't advise on medicine doses. Please ask your doctor or pharmacist. "
                 "I've noted your question for your care team.")
@@ -52,7 +54,41 @@ def dose_guard(state, runtime):
     return None
 
 
-# ── step 3: PII redaction + audit ──
+# ── notebook 03: urgent-reading guard ──
+# The interrupt lives inside log_reading, so it only fires if the model CALLS log_reading.
+# The model can skip it ("I've already logged that"). This guard makes the call itself, in code.
+BP_IN_TEXT = re.compile(r"\b(\d{2,3})\s*/\s*(\d{2,3})\b")                           # CUSTOM: e.g. 190/120
+GLUCOSE_IN_TEXT = re.compile(r"\b(?:glucose|sugar)\b\D{0,20}?(\d{2,3})\b", re.I)    # CUSTOM: e.g. sugar is 320
+
+
+def find_reading(text: str):
+    """Return (kind, value) if the message contains a reading, else None."""
+    bp = BP_IN_TEXT.search(text)
+    if bp:
+        return "blood_pressure", f"{bp.group(1)}/{bp.group(2)}"
+    glucose = GLUCOSE_IN_TEXT.search(text)
+    if glucose:
+        return "glucose", glucose.group(1)
+    return None
+
+
+@before_model(can_jump_to=["tools"])
+def urgent_reading_guard(state, runtime):
+    last = state["messages"][-1]
+    if runtime.context.role != "patient" or not isinstance(last, HumanMessage):
+        return None
+    reading = find_reading(last.text)
+    if not reading:
+        return None
+    kind, value = reading
+    if not is_urgent(runtime.context.patient_token, kind, value):
+        return None   # normal readings: the model logs them as usual
+    # Write the tool call ourselves and skip the model: log_reading runs, and its interrupt() pauses for a nurse
+    call = {"name": "log_reading", "args": {"kind": kind, "value": value}, "id": f"guard-{uuid4().hex[:8]}"}
+    return {"messages": [AIMessage(content="", tool_calls=[call])], "jump_to": "tools"}
+
+
+# ── notebook 02: PII redaction + audit ──
 def pii_middleware():
     # CUSTOM: our identifier formats. The redaction itself is LangChain's.
     return [PIIMiddleware(name, detector=pattern, strategy="redact",
@@ -71,7 +107,7 @@ async def audit_log(request, handler):
     return await handler(request)
 
 
-# ── step 4: dynamic tools, model and prompt ──
+# ── notebook 02: dynamic tools, model and prompt ──
 class CareState(AgentState):
     identity_verified: NotRequired[bool]
 
@@ -99,7 +135,7 @@ async def pick_tools_and_model(request, handler):
 
 @dynamic_prompt
 async def care_prompt(request):
-    """Prompt by role and language, plus what we remember about this patient (step 6)."""
+    """Prompt by role and language, plus what we remember about this patient (notebook 06)."""
     ctx = request.runtime.context
     tone = ("You are talking to a doctor. Be brief and clinical."
             if ctx.role == "doctor" else "You are talking to a patient. Use plain, warm language.")
@@ -114,6 +150,7 @@ def build_middleware():
     """Runs top to bottom on the way in. Redaction sits above summarization on purpose."""
     return [
         dose_guard,
+        urgent_reading_guard,
         *pii_middleware(),
         SummarizationMiddleware(MODEL, trigger=("messages", 40), keep=("messages", 20)),
         care_prompt,

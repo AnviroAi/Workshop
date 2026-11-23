@@ -5,26 +5,47 @@ A care assistant for patients with long-term conditions, built one framework pri
 
 ## Setup
 
+Needs **Python 3.11+**.
+
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env      # add your OpenAI and LangSmith keys
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r requirements.txt    # everything: notebooks, backend, UI, tests
+cp .env.example .env               # then fill in your keys
+```
+
+| Key in `.env` | Needed for | Get one at |
+|---|---|---|
+| `OPENAI_API_KEY` | Everything (model + embeddings) | platform.openai.com |
+| `LANGSMITH_API_KEY` | Traces and Studio | smith.langchain.com |
+| `TAVILY_API_KEY` | Only the web search cell in 00 | tavily.com (free tier) |
+
+Open the notebooks:
+
+```bash
+jupyter lab                        # then open notebooks/00_intro.ipynb
+```
+
+Run the app (two terminals, both with the venv activated):
+
+```bash
+langgraph dev                      # terminal 1: the agent server on :2024
+streamlit run ui/streamlit_app.py  # terminal 2: the UI on :8501
 ```
 
 ## Start at `notebooks/00_intro.ipynb`
 
 | # | Notebook | The limitation it fixes | New framework pieces |
 |---|---|---|---|
-| 00 | `00_intro` | From a bare LLM to an agent (university example) | `init_chat_model`, checkpointer, `@tool`, RAG, `HumanInTheLoopMiddleware` |
+| 00 | `00_intro` | From a bare LLM to an agent (university example) | `init_chat_model`, checkpointer, `@tool`, Tavily web search, RAG, `HumanInTheLoopMiddleware` |
 | 01 | `01_agent` | An LLM can only talk | `create_agent`, `@tool`, `context_schema`, `ToolRuntime` |
-| 02 | `02_safety_and_evals` | Code must decide some things; no proof it works | `interrupt()` in a tool, `@before_model`, `client.evaluate` |
-| 03 | `03_rag` | Can't read our documents, leaks IDs | vector store + retrieval tool, context filter, `PIIMiddleware`, `@wrap_tool_call` |
-| 04 | `04_middleware` | Same tools and prompt for everyone | `Command(update=...)`, `state_schema`, `@wrap_model_call`, `@dynamic_prompt`, prebuilt middleware |
+| 02 | `02_middleware` | Same tools and prompt for everyone; nowhere for rules that must always run | the hooks (`@before_model`, `@after_model`, `@wrap_tool_call`, `@wrap_model_call`, `@dynamic_prompt`), `Command(update=...)`, `state_schema`, prebuilt middleware incl. `PIIMiddleware` |
+| 03 | `03_safety` | Some decisions are too important for the model | prompt vs. guard exercise, `dose_guard` (`@before_model`), `interrupt()` in a tool |
+| 04 | `04_rag` | Can't read our documents | vector store + retrieval tool, context filter, the full middleware stack |
 | 05 | `05_multi_agent` | One agent with too many tools | agents as tools, `response_format`, `StateGraph` |
 | 06 | `06_long_term_memory` | New chat = blank slate | `Store`, `runtime.store`, semantic search |
 
 Each notebook imports what earlier notebooks built from `notebooks/common.py`, and writes only its new idea out in full.
-Every notebook ends with a benchmark cell: compare the experiments in LangSmith (`02-baseline` → `06-memory`).
 
 ## The backend (`app/`)
 
@@ -60,8 +81,6 @@ Demo: as Sara, send *"My BP is 190/120"* → switch to Dr. Lee → *Send note & 
 
 ```bash
 pytest                          # fast tests of our CUSTOM rules (no API calls)
-python -m evals.run_eval        # the 10 scenarios against app/, scored locally
-python -m evals.run_eval --langsmith   # same, as a LangSmith experiment
 ```
 
 ## What is custom (and why)
