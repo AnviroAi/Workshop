@@ -83,6 +83,19 @@ Demo: as Sara, send *"My BP is 190/120"* → switch to Dr. Lee → *Send note & 
 pytest                          # fast tests of our CUSTOM rules (no API calls)
 ```
 
+## Deploy on Render
+
+`render.yaml` defines two web services: `care-chatbot-backend` (the agent server) and `care-chatbot-ui` (Streamlit).
+
+1. Render → **New → Blueprint** → connect this repo, branch `care-chatbot-workshop`.
+2. Fill in `OPENAI_API_KEY` and `LANGSMITH_API_KEY` for both services. Leave `LANGGRAPH_URL` blank for now.
+3. Once the backend is live, copy its URL (e.g. `https://care-chatbot-backend.onrender.com`),
+   set it as `LANGGRAPH_URL` on the UI service, and redeploy the UI.
+
+`langgraph.render.json` is `langgraph.json` without the `.env` line (Render passes keys as environment variables).
+Notes: `langgraph dev` keeps threads on local disk, so they reset on every redeploy. Free instances sleep after
+~15 minutes idle. There is no login: anyone with the UI link can use your OpenAI credits.
+
 ## What is custom (and why)
 
 Everything else is a LangChain or LangGraph class. Look for `# CUSTOM:` in the code.

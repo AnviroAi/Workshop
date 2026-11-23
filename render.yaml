@@ -1,0 +1,40 @@
+# Render Blueprint: deploys the agent server and the Streamlit UI as two web services.
+# Render dashboard -> New -> Blueprint -> pick this repo. Fill in the secrets it asks for.
+services:
+  # 1. The agent server (same as `langgraph dev` locally)
+  - type: web
+    name: care-chatbot-backend
+    runtime: python
+    plan: free                      # 512 MB; switch to "starter" if it runs out of memory
+    branch: care-chatbot-workshop
+    buildCommand: pip install -r requirements.txt
+    startCommand: langgraph dev --config langgraph.render.json --host 0.0.0.0 --port $PORT --no-browser --no-reload
+    healthCheckPath: /ok
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: OPENAI_API_KEY
+        sync: false                 # Render asks you for the value
+      - key: LANGSMITH_API_KEY
+        sync: false
+      - key: LANGSMITH_TRACING
+        value: "true"
+      - key: LANGSMITH_PROJECT
+        value: care-chatbot-render
+
+  # 2. The Streamlit UI, talks to the backend over HTTP
+  - type: web
+    name: care-chatbot-ui
+    runtime: python
+    plan: free
+    branch: care-chatbot-workshop
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run ui/streamlit_app.py --server.port $PORT --server.address 0.0.0.0
+    healthCheckPath: /_stcore/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: LANGGRAPH_URL
+        sync: false                 # the backend's URL, e.g. https://care-chatbot-backend.onrender.com
+      - key: OPENAI_API_KEY
+        sync: false                 # the UI imports app/ to show the tool policy, which builds the RAG index
